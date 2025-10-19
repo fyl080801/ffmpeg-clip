@@ -51,8 +51,7 @@ const cleanupVideoProcessorListeners = () => {
 const setupPlaybackControllerListeners = () => {
   playbackController.on("timeupdate", (time: number) => {
     currentTime.value = time
-    const visibleElements = elementManager.getVisibleElements(time)
-    canvasDrawer.render(visibleElements)
+    canvasDrawer.render()
   })
   playbackController.on("play", () => (playing.value = true))
   playbackController.on("pause", () => (playing.value = false))
@@ -112,8 +111,7 @@ const load = async () => {
 
   setupPlaybackControllerListeners()
 
-  const initialElements = elementManager.getVisibleElements(0)
-  canvasDrawer.render(initialElements)
+  canvasDrawer.render()
 }
 
 onMounted(async () => {
@@ -122,7 +120,8 @@ onMounted(async () => {
     playbackController = new PlaybackController({ elementManager })
     canvasDrawer = new CanvasDrawer(canvas.value, {
       fps,
-      controller: playbackController
+      controller: playbackController,
+      elementManager
     })
 
     playbackController.on("durationupdate", (value) => {
