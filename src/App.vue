@@ -3,9 +3,9 @@ import { ref, onMounted, onUnmounted } from "vue"
 import { ElButton, ElProgress, ElSlider } from "element-plus"
 import { CanvasDrawer } from "./lib/CanvasDrawer"
 import { ElementManager } from "./lib/ElementManager"
-import type { CanvasElement } from "./lib/types"
 import { FFmpegManager, type ProgressEvent } from "./lib/FFmpegManager"
 import { PlaybackController } from "./lib/PlaybackController"
+import { VideoElement, TextElement } from "./lib/elements"
 
 let canvasDrawer: CanvasDrawer
 let elementManager: ElementManager
@@ -30,22 +30,22 @@ const onVpExtractEnd = () => (loadprocess.value = 100)
 const onVpImageLoadStart = () => (statusText.value = "Loading image data...")
 const onVpImageLoadEnd = () => (statusText.value = "")
 
-const setupVideoProcessorListeners = () => {
-  ffmpegManager.on("load:start", onVpLoadStart)
-  ffmpegManager.on("extract:start", onVpExtractStart)
-  ffmpegManager.on("progress", onVpProgress)
-  ffmpegManager.on("extract:end", onVpExtractEnd)
-  ffmpegManager.on("imageload:start", onVpImageLoadStart)
-  ffmpegManager.on("imageload:end", onVpImageLoadEnd)
+const setupElementManagerListeners = () => {
+  elementManager.on("load:start", onVpLoadStart)
+  elementManager.on("extract:start", onVpExtractStart)
+  elementManager.on("progress", onVpProgress)
+  elementManager.on("extract:end", onVpExtractEnd)
+  elementManager.on("imageload:start", onVpImageLoadStart)
+  elementManager.on("imageload:end", onVpImageLoadEnd)
 }
 
-const cleanupVideoProcessorListeners = () => {
-  ffmpegManager.off("load:start", onVpLoadStart)
-  ffmpegManager.off("extract:start", onVpExtractStart)
-  ffmpegManager.off("progress", onVpProgress)
-  ffmpegManager.off("extract:end", onVpExtractEnd)
-  ffmpegManager.off("imageload:start", onVpImageLoadStart)
-  ffmpegManager.off("imageload:end", onVpImageLoadEnd)
+const cleanupElementManagerListeners = () => {
+  elementManager.off("load:start", onVpLoadStart)
+  elementManager.off("extract:start", onVpExtractStart)
+  elementManager.off("progress", onVpProgress)
+  elementManager.off("extract:end", onVpExtractEnd)
+  elementManager.off("imageload:start", onVpImageLoadStart)
+  elementManager.off("imageload:end", onVpImageLoadEnd)
 }
 
 const setupPlaybackControllerListeners = () => {
@@ -58,56 +58,46 @@ const setupPlaybackControllerListeners = () => {
 }
 
 const load = async () => {
-  setupVideoProcessorListeners()
+  setupElementManagerListeners()
   await ffmpegManager.load()
 
-  const extractedImages = await ffmpegManager.extractFrames(
-    "/video/demo.mp4",
-    fps
-  )
-
-  const videoElement: CanvasElement = {
-    id: "main-video",
-    type: "video-frames",
-    rect: {
-      x: 0,
-      y: 0,
-      width: canvas.value!.width,
-      height: canvas.value!.height
-    },
-    timeRange: [0, 5000],
-    zIndex: 0,
-    props: {
-      source: extractedImages
-    }
-  }
-  elementManager.addElement(videoElement)
-
-  elementManager.addElement({
-    id: "sample-text",
-    type: "text",
-    rect: { x: 50, y: 200, width: 200, height: 50 },
-    timeRange: [1200, 4000],
-    zIndex: 1,
-    props: {
+  const elements = [
+    new VideoElement({
+      id: "main-video",
+      rect: {
+        x: 0,
+        y: 0,
+        width: canvas.value!.width,
+        height: canvas.value!.height
+      },
+      timeRange: [0, 5000],
+      zIndex: 0,
+      videoUrl: "/video/demo.mp4"
+    }),
+    new TextElement({
+      id: "sample-text-1",
+      rect: { x: 50, y: 200, width: 200, height: 50 },
+      timeRange: [1200, 4000],
+      zIndex: 1,
       text: "Hello World!",
       font: "40px Arial",
       color: "red"
-    }
-  })
-
-  elementManager.addElement({
-    id: "sample-text",
-    type: "text",
-    rect: { x: 250, y: 500, width: 200, height: 50 },
-    timeRange: [3000, 5000],
-    zIndex: 1,
-    props: {
+    }),
+    new TextElement({
+      id: "sample-text-2",
+      rect: { x: 250, y: 500, width: 200, height: 50 },
+      timeRange: [3000, 5000],
+      zIndex: 1,
       text: "Hello World!",
       font: "40px Arial",
       color: "white"
-    }
-  })
+    })
+  ]
+
+  // Add elements in parallel for efficiency
+  await Promise.all(
+    elements.map((element) => elementManager.addElement(element))
+  )
 
   setupPlaybackControllerListeners()
 
@@ -116,7 +106,7 @@ const load = async () => {
 
 onMounted(async () => {
   if (canvas.value) {
-    elementManager = new ElementManager()
+    elementManager = new ElementManager({ ffmpegManager })
     playbackController = new PlaybackController({ elementManager })
     canvasDrawer = new CanvasDrawer(canvas.value, {
       fps,
@@ -133,7 +123,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  cleanupVideoProcessorListeners()
+  cleanupElementManagerListeners()
   // It's also good practice to clean up playback controller listeners
   // but since it's created and destroyed with the component, it's less critical.
 })

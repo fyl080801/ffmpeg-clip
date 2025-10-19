@@ -1,10 +1,29 @@
 import type { CanvasElement } from "./types"
+import { BaseElement } from "./elements"
+import { FFmpegManager } from "./FFmpegManager"
 
 type EventCallback = (...args: any[]) => void
+
+export interface ElementManagerOptions {
+  ffmpegManager: FFmpegManager
+}
 
 export class ElementManager {
   private elements: CanvasElement[] = []
   private listeners: Map<string, EventCallback[]> = new Map()
+  private ffmpegManager: FFmpegManager
+
+  constructor(options: ElementManagerOptions) {
+    this.ffmpegManager = options.ffmpegManager
+
+    // Proxy ffmpegManager events to elementManager events
+    this.ffmpegManager.on("load:start", () => this.emit("load:start"))
+    this.ffmpegManager.on("extract:start", () => this.emit("extract:start"))
+    this.ffmpegManager.on("progress", (e) => this.emit("progress", e))
+    this.ffmpegManager.on("extract:end", () => this.emit("extract:end"))
+    this.ffmpegManager.on("imageload:start", () => this.emit("imageload:start"))
+    this.ffmpegManager.on("imageload:end", () => this.emit("imageload:end"))
+  }
 
   // --- Event Emitter ---
   public on(event: string, callback: EventCallback): void {
@@ -35,10 +54,22 @@ export class ElementManager {
     }
   }
 
-  addElement(element: CanvasElement) {
-    this.elements.push(element)
+  async addElement(element: BaseElement) {
+    await element.prepare(this.ffmpegManager)
+
+    // Convert to CanvasElement
+    const canvasElement: CanvasElement = {
+      id: element.id,
+      rect: element.rect,
+      timeRange: element.timeRange,
+      zIndex: element.zIndex,
+      type: element.type as any,
+      props: element.props as any
+    }
+
+    this.elements.push(canvasElement)
     this.elements.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
-    this.emit("element-add", element)
+    this.emit("element-add", canvasElement)
   }
 
   removeElement(elementId: string) {
