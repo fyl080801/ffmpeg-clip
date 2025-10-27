@@ -1,3 +1,5 @@
+import type { IDrawable, IFFmpegElement } from "./elements"
+
 export interface ElementRect {
   x: number
   y: number
@@ -31,7 +33,8 @@ export interface TextProps {
 // Discriminated Union
 export type CanvasElement = BaseCanvasElement &
   (
-    | { type: "video-frames"; props: VideoFramesProps }
+    | ({ type: "video-frames"; props: VideoFramesProps } & IFFmpegElement)
     | { type: "image"; props: ImageProps }
     | { type: "text"; props: TextProps }
-  )
+  ) &
+  IDrawable

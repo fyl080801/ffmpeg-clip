@@ -1,46 +1,39 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg"
 import { fetchFile, toBlobURL } from "@ffmpeg/util"
+import { EventEmitter, type IEventEmitter } from "./EventEmitter"
 
 export type ProgressEvent = { progress: number; time: number }
 
-type EventCallback = (...args: any[]) => void
-
-export class FFmpegManager {
+interface Events {
+  loading(): void
+  loaded(): void
+  progress(event: ProgressEvent): void
+  extracting(): void
+  extracted(): void
+  imageloading(): void
+  imageloaded(): void
+}
+export class FFmpegManager implements IEventEmitter<Events> {
   private ffmpeg = new FFmpeg()
-  private listeners: Map<string, EventCallback[]> = new Map()
+  private listeners = new EventEmitter<Events>()
+  private _fps: number = 30
+
+  constructor(options: any) {
+    this._fps = options.fps
+  }
 
   // --- Event Emitter Implementation ---
-  public on(event: string, callback: EventCallback): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, [])
-    }
-    this.listeners.get(event)!.push(callback)
+  on<K extends keyof Events>(eventName: K, handler: Events[K]): void {
+    this.listeners.on(eventName, handler)
   }
 
-  public off(event: string, callback: EventCallback): void {
-    if (this.listeners.has(event)) {
-      const eventListeners = this.listeners
-        .get(event)!
-        .filter((cb) => cb !== callback)
-      this.listeners.set(event, eventListeners)
-    }
-  }
-
-  private emit(event: string, ...args: any[]): void {
-    if (this.listeners.has(event)) {
-      this.listeners.get(event)!.forEach((callback) => {
-        try {
-          callback(...args)
-        } catch (e) {
-          console.error(`Error in event listener for ${event}:`, e)
-        }
-      })
-    }
+  off<K extends keyof Events>(eventName: K, handler: Events[K]): void {
+    this.listeners.off(eventName, handler)
   }
   // --- End Event Emitter ---
 
   public async load(): Promise<void> {
-    this.emit("load:start")
+    this.listeners.emit("loading")
     const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm"
     await this.ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
@@ -49,20 +42,21 @@ export class FFmpegManager {
         "application/wasm"
       )
     })
-    this.emit("load:end")
+    this.listeners.emit("loaded")
   }
 
   public get ffmpegInstance(): FFmpeg {
     return this.ffmpeg
   }
 
-  public async extractFrames(
-    videoUrl: string,
-    fps: number = 30
-  ): Promise<HTMLImageElement[]> {
-    this.emit("extract:start")
+  public get fps(): number {
+    return this._fps
+  }
+
+  public async extractFrames(videoUrl: string): Promise<HTMLImageElement[]> {
+    this.listeners.emit("extracting")
     this.ffmpeg.on("progress", (e: ProgressEvent) => {
-      this.emit("progress", e)
+      this.listeners.emit("progress", e)
     })
 
     const videoData = await fetchFile(videoUrl)
@@ -72,13 +66,13 @@ export class FFmpegManager {
       "-i",
       "input.mp4",
       "-vf",
-      `fps=${fps}`,
+      `fps=${this._fps}`,
       "frame_%d.png"
     ])
 
-    this.emit("extract:end")
+    this.listeners.emit("extracted")
 
-    this.emit("imageload:start")
+    this.listeners.emit("imageloading")
     const frameFiles = (await this.ffmpeg.listDir("/")).filter((f: any) =>
       f.name.startsWith("frame_")
     )
@@ -107,7 +101,7 @@ export class FFmpegManager {
     }
 
     await Promise.all(imageLoadPromises)
-    this.emit("imageload:end")
+    this.listeners.emit("imageloaded")
     return framesImages
   }
 }

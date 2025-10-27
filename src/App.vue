@@ -6,144 +6,196 @@ import { ElementManager } from "./lib/ElementManager"
 import { FFmpegManager, type ProgressEvent } from "./lib/FFmpegManager"
 import { PlaybackController } from "./lib/PlaybackController"
 import { VideoElement, TextElement } from "./lib/elements"
+import { Player } from "./lib/Player"
 
-let canvasDrawer: CanvasDrawer
-let elementManager: ElementManager
-let playbackController: PlaybackController
-const ffmpegManager = new FFmpegManager()
+let player: Player
+
+// const ffmpegManager = new FFmpegManager()
+
+// const init = (elm: HTMLCanvasElement) => {
+//   let canvasDrawer: CanvasDrawer
+//   let elementManager: ElementManager
+//   let playbackController: PlaybackController
+
+//   elementManager = new ElementManager({ ffmpegManager })
+//   playbackController = new PlaybackController({ elementManager })
+//   canvasDrawer = new CanvasDrawer(elm, {
+//     fps,
+//     controller: playbackController,
+//     elementManager
+//   })
+
+//   playbackController.on("durationupdate", (value) => {
+//     totalDuration.value = value
+//   })
+
+//   playbackController.on("timeupdate", (time: number) => {
+//     currentTime.value = time
+//     canvasDrawer.render()
+//   })
+//   playbackController.on("play", () => (playing.value = true))
+//   playbackController.on("pause", () => (playing.value = false))
+// }
+
 const canvas = ref<HTMLCanvasElement>()
-
 const playing = ref(false)
 const statusText = ref("Loading...")
-const loadprocess = ref(0)
-const fps = 30
 
-const currentTime = ref(0) // in milliseconds
-const totalDuration = ref(0) // in milliseconds
+const init = () => {
+  if (!canvas.value) return
 
-// --- Event Handlers ---
-const onVpLoadStart = () => (statusText.value = "Loading ffmpeg...")
-const onVpExtractStart = () => (statusText.value = "Extracting frames...")
-const onVpProgress = (e: ProgressEvent) =>
-  (loadprocess.value = e.progress * 100)
-const onVpExtractEnd = () => (loadprocess.value = 100)
-const onVpImageLoadStart = () => (statusText.value = "Loading image data...")
-const onVpImageLoadEnd = () => (statusText.value = "")
-
-const setupElementManagerListeners = () => {
-  elementManager.on("load:start", onVpLoadStart)
-  elementManager.on("extract:start", onVpExtractStart)
-  elementManager.on("progress", onVpProgress)
-  elementManager.on("extract:end", onVpExtractEnd)
-  elementManager.on("imageload:start", onVpImageLoadStart)
-  elementManager.on("imageload:end", onVpImageLoadEnd)
-}
-
-const cleanupElementManagerListeners = () => {
-  elementManager.off("load:start", onVpLoadStart)
-  elementManager.off("extract:start", onVpExtractStart)
-  elementManager.off("progress", onVpProgress)
-  elementManager.off("extract:end", onVpExtractEnd)
-  elementManager.off("imageload:start", onVpImageLoadStart)
-  elementManager.off("imageload:end", onVpImageLoadEnd)
-}
-
-const setupPlaybackControllerListeners = () => {
-  playbackController.on("timeupdate", (time: number) => {
-    currentTime.value = time
-    canvasDrawer.render()
+  player = new Player(canvas.value, {
+    fps: 30
   })
-  playbackController.on("play", () => (playing.value = true))
-  playbackController.on("pause", () => (playing.value = false))
+
+  player.start()
+
+  player.on("ready", () => {
+    player.addElement({
+      type: "video-frames",
+      id: "main-video"
+      // rect: {
+      //   x: 0,
+      //   y: 0,
+      //   width: canvas.value!.width,
+      //   height: canvas.value!.height
+      // },
+      // timeRange: [0, 5000],
+      // zIndex: 0,
+      // videoUrl: "/video/demo.mp4"
+    })
+  })
 }
 
-const load = async () => {
-  setupElementManagerListeners()
-  await ffmpegManager.load()
+// const loadprocess = ref(0)
+// const fps = 30
 
-  const elements = [
-    new VideoElement({
-      id: "main-video",
-      rect: {
-        x: 0,
-        y: 0,
-        width: canvas.value!.width,
-        height: canvas.value!.height
-      },
-      timeRange: [0, 5000],
-      zIndex: 0,
-      videoUrl: "/video/demo.mp4"
-    }),
-    new TextElement({
-      id: "sample-text-1",
-      rect: { x: 50, y: 200, width: 200, height: 50 },
-      timeRange: [1200, 4000],
-      zIndex: 1,
-      text: "Hello World!",
-      font: "40px Arial",
-      color: "red"
-    }),
-    new TextElement({
-      id: "sample-text-2",
-      rect: { x: 250, y: 500, width: 200, height: 50 },
-      timeRange: [3000, 5000],
-      zIndex: 1,
-      text: "Hello World!",
-      font: "40px Arial",
-      color: "white"
-    })
-  ]
+// const currentTime = ref(0) // in milliseconds
+// const totalDuration = ref(0) // in milliseconds
 
-  // Add elements in parallel for efficiency
-  await Promise.all(
-    elements.map((element) => elementManager.addElement(element))
-  )
+// // --- Event Handlers ---
+// const onVpLoadStart = () => (statusText.value = "Loading ffmpeg...")
+// const onVpExtractStart = () => (statusText.value = "Extracting frames...")
+// const onVpProgress = (e: ProgressEvent) =>
+//   (loadprocess.value = e.progress * 100)
+// const onVpExtractEnd = () => (loadprocess.value = 100)
+// const onVpImageLoadStart = () => (statusText.value = "Loading image data...")
+// const onVpImageLoadEnd = () => (statusText.value = "")
 
-  setupPlaybackControllerListeners()
+// const setupElementManagerListeners = () => {
+//   elementManager.on("load:start", onVpLoadStart)
+//   elementManager.on("extract:start", onVpExtractStart)
+//   elementManager.on("progress", onVpProgress)
+//   elementManager.on("extract:end", onVpExtractEnd)
+//   elementManager.on("imageload:start", onVpImageLoadStart)
+//   elementManager.on("imageload:end", onVpImageLoadEnd)
+// }
 
-  canvasDrawer.render()
-}
+// const cleanupElementManagerListeners = () => {
+//   elementManager.off("load:start", onVpLoadStart)
+//   elementManager.off("extract:start", onVpExtractStart)
+//   elementManager.off("progress", onVpProgress)
+//   elementManager.off("extract:end", onVpExtractEnd)
+//   elementManager.off("imageload:start", onVpImageLoadStart)
+//   elementManager.off("imageload:end", onVpImageLoadEnd)
+// }
 
-onMounted(async () => {
-  if (canvas.value) {
-    elementManager = new ElementManager({ ffmpegManager })
-    playbackController = new PlaybackController({ elementManager })
-    canvasDrawer = new CanvasDrawer(canvas.value, {
-      fps,
-      controller: playbackController,
-      elementManager
-    })
+// const setupPlaybackControllerListeners = () => {
+//   playbackController.on("timeupdate", (time: number) => {
+//     currentTime.value = time
+//     canvasDrawer.render()
+//   })
+//   playbackController.on("play", () => (playing.value = true))
+//   playbackController.on("pause", () => (playing.value = false))
+// }
 
-    playbackController.on("durationupdate", (value) => {
-      totalDuration.value = value
-    })
+// const load = async () => {
+//   // setupElementManagerListeners()
+//   await ffmpegManager.load()
 
-    await load()
-  }
+//   const elements = [
+//     new VideoElement({
+//       id: "main-video",
+//       rect: {
+//         x: 0,
+//         y: 0,
+//         width: canvas.value!.width,
+//         height: canvas.value!.height
+//       },
+//       timeRange: [0, 5000],
+//       zIndex: 0,
+//       videoUrl: "/video/demo.mp4"
+//     }),
+//     new TextElement({
+//       id: "sample-text-1",
+//       rect: { x: 50, y: 200, width: 200, height: 50 },
+//       timeRange: [1200, 4000],
+//       zIndex: 1,
+//       text: "Hello World!",
+//       font: "40px Arial",
+//       color: "red"
+//     }),
+//     new TextElement({
+//       id: "sample-text-2",
+//       rect: { x: 250, y: 500, width: 200, height: 50 },
+//       timeRange: [3000, 5000],
+//       zIndex: 1,
+//       text: "Hello World!",
+//       font: "40px Arial",
+//       color: "white"
+//     })
+//   ]
+
+//   // Add elements in parallel for efficiency
+//   await Promise.all(
+//     elements.map((element) => elementManager.addElement(element))
+//   )
+
+//   setupPlaybackControllerListeners()
+
+//   canvasDrawer.render()
+// }
+
+onMounted(() => {
+  init()
+  // if (canvas.value) {
+  //   init(canvas.value)
+  //   // elementManager = new ElementManager({ ffmpegManager })
+  //   // playbackController = new PlaybackController({ elementManager })
+  //   // canvasDrawer = new CanvasDrawer(canvas.value, {
+  //   //   fps,
+  //   //   controller: playbackController,
+  //   //   elementManager
+  //   // })
+  //   // playbackController.on("durationupdate", (value) => {
+  //   //   totalDuration.value = value
+  //   // })
+  //   await load()
+  // }
 })
 
-onUnmounted(() => {
-  cleanupElementManagerListeners()
-  // It's also good practice to clean up playback controller listeners
-  // but since it's created and destroyed with the component, it's less critical.
-})
+// onUnmounted(() => {
+//   // cleanupElementManagerListeners()
+//   // It's also good practice to clean up playback controller listeners
+//   // but since it's created and destroyed with the component, it's less critical.
+// })
 
-const formatTime = (timeInMs: number) => {
-  const totalSeconds = timeInMs / 1000
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = Math.floor(totalSeconds % 60)
-  const milliseconds = Math.floor(timeInMs % 1000)
-  return `${minutes.toString().padStart(2, "0")}:${seconds
-    .toString()
-    .padStart(2, "0")}.${milliseconds.toString().padStart(3, "0")}`
-}
+// const formatTime = (timeInMs: number) => {
+//   const totalSeconds = timeInMs / 1000
+//   const minutes = Math.floor(totalSeconds / 60)
+//   const seconds = Math.floor(totalSeconds % 60)
+//   const milliseconds = Math.floor(timeInMs % 1000)
+//   return `${minutes.toString().padStart(2, "0")}:${seconds
+//     .toString()
+//     .padStart(2, "0")}.${milliseconds.toString().padStart(3, "0")}`
+// }
 
-const handleSliderSeek = (time: number | number[]) => {
-  const newTime = Array.isArray(time) ? time[0] : time
-  if (playbackController && newTime !== undefined) {
-    playbackController.seek(newTime)
-  }
-}
+// const handleSliderSeek = (time: number | number[]) => {
+//   const newTime = Array.isArray(time) ? time[0] : time
+//   if (playbackController && newTime !== undefined) {
+//     playbackController.seek(newTime)
+//   }
+// }
 </script>
 
 <template>
@@ -163,7 +215,7 @@ const handleSliderSeek = (time: number | number[]) => {
         </div>
       </div>
       <div class="controls-container">
-        <div class="w-[700px] mx-auto">
+        <!-- <div class="w-[700px] mx-auto">
           <div v-if="statusText" class="text-center my-2">
             <p>{{ statusText }}</p>
             <ElProgress
@@ -195,7 +247,7 @@ const handleSliderSeek = (time: number | number[]) => {
               {{ playing ? "Pause" : "Play" }}
             </ElButton>
           </div>
-        </div>
+        </div> -->
       </div>
     </div>
   </div>

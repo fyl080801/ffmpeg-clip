@@ -1,13 +1,27 @@
 import type { ElementManager } from "./ElementManager"
+import EventEmitter, { type IEventEmitter } from "./EventEmitter"
 
-type EventCallback = (...args: any[]) => void
+interface Events {
+  durationupdate(duration: number): void
+  timeupdate(time: number): void
+  play(): void
+  pause(): void
+  end(): void
+  seek(time: number): void
+}
+
+export interface IPlay {
+  play(): void
+  pause(): void
+  seek(time: number): void
+}
 
 export interface PlaybackControllerOption {
   elementManager: ElementManager
 }
 
-export class PlaybackController {
-  private listeners: Map<string, EventCallback[]> = new Map()
+export class PlaybackController implements IPlay, IEventEmitter<Events> {
+  private listeners = new EventEmitter<Events>()
   private totalDuration: number // in ms
 
   private _isPlaying = false
@@ -20,49 +34,27 @@ export class PlaybackController {
 
   private updateTotalDuration = () => {
     this.totalDuration = this.elementManager.getMaxTime()
-    this.emit("durationupdate", this.totalDuration)
+    this.listeners.emit("durationupdate", this.totalDuration)
   }
 
   constructor(options: PlaybackControllerOption) {
     this.totalDuration = 0
     this.elementManager = options.elementManager
-    this.elementManager.on("element-add", this.updateTotalDuration)
-    this.elementManager.on("element-update", this.updateTotalDuration)
-    this.elementManager.on("element-remove", this.updateTotalDuration)
+    this.elementManager.on("add", this.updateTotalDuration)
+    this.elementManager.on("update", this.updateTotalDuration)
+    this.elementManager.on("remove", this.updateTotalDuration)
+  }
+
+  on<K extends keyof Events>(eventName: K, handler: Events[K]): void {
+    this.listeners.on(eventName, handler)
+  }
+  off<K extends keyof Events>(eventName: K, handler: Events[K]): void {
+    this.listeners.off(eventName, handler)
   }
 
   public update(options: { duration?: number }): void {
     if (options.duration !== undefined) {
       this.totalDuration = options.duration
-    }
-  }
-
-  // --- Event Emitter ---
-  public on(event: string, callback: EventCallback): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, [])
-    }
-    this.listeners.get(event)!.push(callback)
-  }
-
-  public off(event: string, callback: EventCallback): void {
-    if (this.listeners.has(event)) {
-      const eventListeners = this.listeners
-        .get(event)!
-        .filter((cb) => cb !== callback)
-      this.listeners.set(event, eventListeners)
-    }
-  }
-
-  private emit(event: string, ...args: any[]): void {
-    if (this.listeners.has(event)) {
-      this.listeners.get(event)!.forEach((callback) => {
-        try {
-          callback(...args)
-        } catch (e) {
-          console.error(`Error in event listener for ${event}:`, e)
-        }
-      })
     }
   }
 
@@ -82,7 +74,7 @@ export class PlaybackController {
       this.timeWhenPaused = 0
     }
     this._isPlaying = true
-    this.emit("play")
+    this.listeners.emit("play")
     this.animationLoopStart = performance.now() - this.timeWhenPaused
     this.runAnimationLoop()
   }
@@ -90,7 +82,7 @@ export class PlaybackController {
   public pause(): void {
     if (!this._isPlaying) return
     this._isPlaying = false
-    this.emit("pause")
+    this.listeners.emit("pause")
     this.timeWhenPaused = this._currentTime
     if (this.animationId) {
       cancelAnimationFrame(this.animationId)
@@ -110,8 +102,8 @@ export class PlaybackController {
     const newTime = Math.max(0, Math.min(time, this.totalDuration))
     this._currentTime = newTime
     this.timeWhenPaused = newTime // Update pause time for correct resume
-    this.emit("timeupdate", newTime)
-    this.emit("seek", newTime)
+    this.listeners.emit("timeupdate", newTime)
+    this.listeners.emit("seek", newTime)
   }
 
   private runAnimationLoop = (): void => {
@@ -122,11 +114,11 @@ export class PlaybackController {
     if (elapsedTime >= this.totalDuration) {
       this._currentTime = this.totalDuration
       this.pause() // This will emit 'pause'
-      this.emit("timeupdate", this._currentTime)
-      this.emit("ended")
+      this.listeners.emit("timeupdate", this._currentTime)
+      this.listeners.emit("end")
     } else {
       this._currentTime = elapsedTime
-      this.emit("timeupdate", this._currentTime)
+      this.listeners.emit("timeupdate", this._currentTime)
       this.animationId = requestAnimationFrame(this.runAnimationLoop)
     }
   }

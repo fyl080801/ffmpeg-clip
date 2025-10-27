@@ -1,5 +1,19 @@
-import type { ElementRect, ImageProps, VideoFramesProps, TextProps } from "./types"
+import type {
+  ElementRect,
+  ImageProps,
+  VideoFramesProps,
+  TextProps
+} from "./types"
 import type { FFmpegManager } from "./FFmpegManager"
+import { EventEmitter, type IEventEmitter } from "./EventEmitter"
+
+export interface IFFmpegElement {
+  prepare(ffmpegManager: FFmpegManager): Promise<void>
+}
+
+export interface IDrawable {
+  draw(context: CanvasRenderingContext2D, currentTime: number): void
+}
 
 export abstract class BaseElement {
   id: string
@@ -21,11 +35,9 @@ export abstract class BaseElement {
 
   abstract get type(): string
   abstract get props(): ImageProps | VideoFramesProps | TextProps
-
-  abstract prepare(ffmpegManager: FFmpegManager): Promise<void>
 }
 
-export class ImageElement extends BaseElement {
+export class ImageElement extends BaseElement implements IDrawable {
   props: { source: HTMLImageElement }
 
   constructor(props: {
@@ -48,14 +60,28 @@ export class ImageElement extends BaseElement {
     return "image"
   }
 
-  async prepare(ffmpegManager: FFmpegManager): Promise<void> {
-    // No preparation needed for image elements
+  draw(context: CanvasRenderingContext2D): void {
+    context.drawImage(
+      this.props.source,
+      this.rect.x,
+      this.rect.y,
+      this.rect.width,
+      this.rect.height
+    )
   }
 }
 
-export class VideoElement extends BaseElement {
+interface VideoElementEvents {}
+
+export class VideoElement
+  extends BaseElement
+  implements IFFmpegElement, IDrawable, IEventEmitter<VideoElementEvents>
+{
   videoUrl: string
   props: { source: HTMLImageElement[] } = { source: [] }
+
+  private listeners = new EventEmitter<VideoElementEvents>()
+  private ffmpegManager?: FFmpegManager
 
   constructor(props: {
     id: string
@@ -73,17 +99,60 @@ export class VideoElement extends BaseElement {
     this.videoUrl = props.videoUrl
   }
 
+  on<K extends never>(eventName: K, handler: {}[K]): void {
+    this.listeners.on(eventName, handler)
+  }
+
+  off<K extends never>(eventName: K, handler: {}[K]): void {
+    this.listeners.off(eventName, handler)
+  }
+
   get type() {
     return "video-frames"
   }
 
   async prepare(ffmpegManager: FFmpegManager): Promise<void> {
-    const frames = await ffmpegManager.extractFrames(this.videoUrl, 30)
-    this.props.source = frames
+    if (!ffmpegManager) return
+
+    this.ffmpegManager = ffmpegManager
+    this.props.source = await this.ffmpegManager.extractFrames(this.videoUrl)
+  }
+
+  draw(context: CanvasRenderingContext2D, currentTime: number): void {
+    if (!this.ffmpegManager) return
+
+    // Use block scope to prevent variable name clashes
+    const source = this.props.source
+    if (source.length === 0) return
+    let frameIndexInElement
+    if (currentTime === this.timeRange[1]) {
+      // If at the exact end time, render the last frame.
+      frameIndexInElement = source.length - 1
+    } else {
+      const timeIntoElement = currentTime - this.timeRange[0] // in ms
+      frameIndexInElement = Math.floor(
+        (timeIntoElement / 1000) * this.ffmpegManager.fps
+      )
+    }
+    // Clamp the index to be safe
+    frameIndexInElement = Math.max(
+      0,
+      Math.min(frameIndexInElement, source.length - 1)
+    )
+    const frameImage = source[frameIndexInElement]
+    if (frameImage && frameImage.complete) {
+      context.drawImage(
+        frameImage,
+        this.rect.x,
+        this.rect.y,
+        this.rect.width,
+        this.rect.height
+      )
+    }
   }
 }
 
-export class TextElement extends BaseElement {
+export class TextElement extends BaseElement implements IDrawable {
   props: { text: string; font?: string; color?: string }
 
   constructor(props: {
@@ -112,7 +181,9 @@ export class TextElement extends BaseElement {
     return "text"
   }
 
-  async prepare(ffmpegManager: FFmpegManager): Promise<void> {
-    // No preparation needed for text elements
+  draw(context: CanvasRenderingContext2D): void {
+    context.font = this.props.font || "30px Arial"
+    context.fillStyle = this.props.color || "black"
+    context.fillText(this.props.text, this.rect.x, this.rect.y)
   }
 }
