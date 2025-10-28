@@ -1,10 +1,12 @@
 import type { ElementManager } from "./ElementManager"
 import type { PlaybackController } from "./PlaybackController"
+import { TransformController } from "./TransformController"
 
 export interface CanvasDrawerOptions {
   fps: number
   controller: PlaybackController
   elementManager: ElementManager
+  transformController: TransformController
 }
 
 export class CanvasDrawer {
@@ -12,6 +14,7 @@ export class CanvasDrawer {
   private ctx: CanvasRenderingContext2D
   private controller: PlaybackController
   private elementManager: ElementManager
+  private transformController: TransformController
 
   constructor(canvas: HTMLCanvasElement, options: CanvasDrawerOptions) {
     this.canvas = canvas
@@ -22,6 +25,7 @@ export class CanvasDrawer {
     this.ctx = context
     this.controller = options.controller
     this.elementManager = options.elementManager
+    this.transformController = options.transformController
   }
 
   render() {
@@ -34,5 +38,7 @@ export class CanvasDrawer {
     )) {
       element.draw(this.ctx, this.controller.currentTime)
     }
+
+    this.transformController.drawSelection(this.ctx)
   }
 }

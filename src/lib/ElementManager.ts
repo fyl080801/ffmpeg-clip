@@ -45,6 +45,10 @@ export class ElementManager implements IEventEmitter<Events> {
     }
   }
 
+  getElements(): CanvasElement[] {
+    return this.elements
+  }
+
   getMaxTime(): number {
     if (this.elements.length === 0) {
       return 0
@@ -68,5 +72,9 @@ export class ElementManager implements IEventEmitter<Events> {
       }
     }
     return visibleElements
+  }
+
+  clearElements() {
+    this.elements = []
   }
 }
