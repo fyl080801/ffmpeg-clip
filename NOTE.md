@@ -7,3 +7,7 @@
 实现思路：
 
 1. ffmpeg 获取的是视频的每一帧图片
+
+canvas编辑看看能不能用这个组件
+
+https://www.leaferjs.com/ui/guide/
