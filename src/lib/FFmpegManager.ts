@@ -37,10 +37,11 @@ export class FFmpegManager implements IEventEmitter<Events> {
     const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm"
     await this.ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(
-        `${baseURL}/ffmpeg-core.wasm`,
-        "application/wasm"
-      )
+      // wasmURL: await toBlobURL(
+      //   `${baseURL}/ffmpeg-core.wasm`,
+      //   "application/wasm"
+      // )
+      wasmURL: await toBlobURL("/ffmpeg/ffmpeg-core.wasm", "application/wasm")
     })
     this.listeners.emit("loaded")
   }
